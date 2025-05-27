@@ -1,0 +1,49 @@
+* Thread Scheduling
+** Contection scope
+   User threads are mapped to kernel threads
+**** The contention scope 
+     refers to the competition the User level thread to access the kernel resources
+     哪些实体一起入队竞争同一个资源 (eg. klt compete for CPU, ult compete for klt)
+**** Process Contention Scope (PCS)
+     - only multiple ULT in a process compete for single or serveral kernel threads
+     - scheduler: the user thread lib 
+       the kernel have no sense of the user threads
+     - costs: low (no system call)
+     - but may not able to use multiple cores
+     - models:  Many-To-One, Many-To-Many
+**** System Contention Scope (SCS)
+     - the threads in the system (KLT) compete for CPU
+       user thread join the system scheduling through projecting to LWP then KLT
+     - switching cost is huge (system call and context switching)
+     - but, advantage: can use multiple cores
+     - models: One-To-One, May-to-Many (SCS optional)
+**** the thread models:
+***** Many-To-One: may user process to a kernel thread
+      - mapping: multiple user thread to single kernel thread
+      - competition: PCS only, cause only one LWP, only one cpu thread can be used
+***** One-To-One: one user process to one kernel thread
+      - mapping: one user thread to one kernel therad
+      - competition: SCS only, each user thread is a system entity
+***** Many-To-Many: many user processes to may kernel threads (the user threads can equal or smaller than kernel threads number)
+      - mapping: multiple user thread -> multiple LWP
+      - competition: 
+        PCS: user thread lib will schedule the user therad to LWP
+        SCS: let the KLT join the global scheduling
+***** struct
+      ULT -> LWP -> KLT
+** Thread Scheduling
+*** process contention scopt (PCS)
+    - entities: all the ults in the smae process
+    - scheduler: user thread lib
+    - resources: LWP (multiple or single)
+      utl will compete for switching chance
+    - models: One-To-One, Many-To-Many
+    ~ Many-To-One: multiple ults to single LWP
+    ~ Many-To-Many: multiple ults to multiple LWP
+*** System Contention Scope (SCS)
+    - entities: all the KLT in the system
+    - scheduler: kernel
+    - resources: CPU cores' time slices
+      KLT will compete with each other for next avaliable cpu cores
+    - models:
+    ~ One-to-One:
