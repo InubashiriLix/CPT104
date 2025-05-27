@@ -46,4 +46,206 @@
     - resources: CPU cores' time slices
       KLT will compete with each other for next avaliable cpu cores
     - models:
-    ~ One-to-One:
+    ~ One-to-One: each UTL has responding KLT, join the global scheduling 
+    ~ Many-To-Many: bound mode: if you bound some UTL to the LWP, then LWP is the global scheduling KLT
+      (well, the ppt admit O-t-O only, you can ignore this, I guess)
+      (by the way, fuck you! Ms.Mango!)
+
+*** Bound Threads vs Unbound Threads
+**** Unbound:
+     - due to the thread lib in the user space, it is PCS, which compute with other UTL for LWP
+     - mapping is flexible
+**** Unbound Thread:
+     - mannally or in the running time bound UTL to the LWP, to make it be a KLT, and enter SCS
+     - mappning fix, kernel will take this as indepandent schedulable entity and compute for CPU competition
+
+* Multiple-Processor Scheduling
+    for cpu with multiple processors, we assume that each processor is homogeneours, with same performance and function
+
+** Scheduling Methods:
+*** Asymmetricc Mlutiple-procssing ( AMP ) (非对称多处理)
+    only one main processor take control of every scheduler decision and global data structure (like ready queue, process tables)'s editing and modifying
+    other processor take control of executing tasks, they do not take part in schedduling part
+    - Advantage:
+      no need to multiple processor visit the same data structure parallelly, simplify the asynchronous and data sharing problem
+    - disadvantage:
+      scheduler bottleneck, every scheduling requests are sent to the main processsor, the expanding are limited.
+*** Symmetric Multiporcessing (SMP) (对称多处理)
+**** features:
+***** each process have individual kernel scheduler, and take part in the thread / process selection and switching
+***** the ready queue has two organize methods:
+****** Global queue
+       - every processor share a smae ready queue, any processor available can take the task from the queue
+       - advantage: payload is balanced and simple, will not cause the situation when a core is available but the other are busy
+       - disadvantage: 
+         visit global queue need synchronization lock, and compete cost is high
+****** per-processor queue
+       - each processor maintain their own ready queue, only select the task from their own queue
+       - advantage: 
+         local queue need no lock or less lock,
+         cache performs better,
+         context change cost low.
+       - disadvantages:
+         might have imbalanced load like one core is available but the other got full queue
+       - solutions:
+       ~ work stealing:
+         empty core will steal the tasks from the busy core's queue, balanced dynamically
+       ~ Work sharing:
+         when a core got its queue too long, the new tasks will be allocate to other cores' queues
+
+*** Overall
+    when cpu increase, the AMP's bottleneck will become more and more obvious, the SMP is more suitable for the multi-core system
+
+** Asymmetric multiprocessing (AMP)
+   ( Master - Slave ) configuration
+   One processor is the master, and other processor in the system as slaves, The master processor run the IO and processes while slave processors run the process only
+   the process scheduling is performed by the master processor.
+*** diagram:
+    @code text
+    |-----------------------------------------------------------------------------
+    |Master Processor  | Slave Processor | Slave Processor | 
+    |-----------------------------------------------------------------------------
+    |Processor 1       | Processor 2     | Processor 3     | Memory | IO | ...
+    |-----------------------------------------------------------------------------
+    |OS                | User processes  | User Processes  |
+    |User prcesses     |                 |                 |
+    |-----------------------------------------------------------------------------
+    @end
+
+** Symmetric Configuration (SMP)
+   Any processor can access any device and can handle any interrupts generated on it 
+   Mutual exclusion (互斥锁) must be enforced such that only on processor is allowd to execute the OS at one time
+*** diagram
+    @code text
+    ==============================================================
+    Processsor 1   | Processor 2     | Processor 3    | Mem | IO
+    OS             |                 |                | 
+    User processes | User processees | User processes |
+    ==============================================================
+    @end
+
+** Approaches to Symmetric Configuration
+*** Common ready queue (used in AMP)
+    @code text
+    T0 T1 T2 T3 T4 ...
+          |
+    core0 core1 core2 ...
+    @end
+*** per-core run queues
+    @code text
+    core0: T0 T1 T2
+    core1: T3 T4 T5 T6
+    core2: T7
+    core ...
+    @end
+
+** Processor Affinity (处理器亲和性)
+   - def: 
+     binding a task / process to run a specific core or sset fo cores to maximize cache reuse
+   - benefit: 
+     reduces cache-miss panalties when a process stays on the same core 
+     (you can reuse the cache in the same core)
+   - Migration Cost: 
+     Moving to a new core invalidation old core's caches, new core must repopulate, incurring delays 
+     eg. when a the proceess is moved from core A to core B, the cache should be copy again, and delay appears.
+   - Soft Affinity: 
+     OS hints to keep processes on the same core but may override for load balance.
+     advantage:
+     get a sweet point between payload and cache-miss
+   - Hard Affinity: 
+     Process is restrictde to a specified CPU set (via CPU mask); kernel will not schedule it elsewhere
+     eg. administor / user can bind the process to the specific core explicitly
+** Load Balancing
+*** goal: 
+    in the os with multiple cores, you need to allocate the ready tasks to the each core to optimize the repsonse time, resource utilization, and overall throughput
+*** Strategies:
+**** push migration
+     A periodic system daemon check load and push tasks from oveerloaded cores to underloaded ones. 
+**** pull migration
+     idle cores pull taks from other cores' run queues when they fiond themselves without work
+*** Hybrid and Optimization
+    - modern kernel use pull and push migration together, to avoid a core empty and the idle core get the tasks in time
+    - combine with Affinity, can get a balance between cache-miss and load balancing
+*** None-Uniform Memory Access (NUMA) Architecture
+**** Topology
+     - Consists of multiple nodes; each node contains one (or more) CPU(s) and its own local memory.
+     - Nodes are interconnected (via a bus, switch, or ring), allowing CPUs to access remote memory on other nodes.
+**** Memory Access Characteristics
+     - Local access: CPU → its own node’s memory → low latency, high bandwidth (“fast access”).
+     - Remote access: CPU → another node’s memory → higher latency, lower bandwidth (“slow access”).
+**** Scalability & Performance
+     - UMA (Uniform Memory Access) systems suffer contention on a single shared memory bus as CPU count grows.
+     - NUMA alleviates this by distributing memory across nodes; most accesses hit local memory, reducing global traffic.
+**** Operating System Support
+***** Processor Affinity: OS tries to schedule a process/ thread on the same NUMA node where its data resides to maximize cache hits.
+      - Soft Affinity: OS “hints” at preferred node but may migrate if load unbalanced.
+      - Hard Affinity: Process is pinned to a specific node or set of nodes (CPU mask).
+***** Load Balancing:
+      - Keep nodes busy but avoid excessive cross‑node memory traffic.
+      - Combine push/pull migration with NUMA‑aware policies to move tasks only when beneficial.
+**** Design Trade‑Offs
+     - Locality vs. Balance: Strong affinity improves cache reuse but can lead to hot‑node overload; periodic rebalancing may be required.
+     - Complexity: NUMA‑aware scheduling and memory allocation add algorithmic overhead versus simpler UMA strategies.
+
+** Memory Stall in Single Core CPU
+   when the single core CPU is executing a proceess, if cache-miss, it will wait the main mem to return the data, 
+   C - compute cycle, M -> memory stall 
+   @code text
+   [ C ] -> [ M ] -> [ C ] -> [ M ] -> ...
+   @end
+
+** Multicore Processor
+*** Multicore Advantage:
+    mutlicore cpu integrate multiple cores on a single chip, thus 
+    it can run parrallely, 
+    when a core is stalled on memory access, other cores can continue to run their tasks, 
+    overall, the throughout and response perform much better 
+*** Hyper-Threading (超线程) / SMT
+    - each physical core expose serveral "logic core" (hardware thread)
+    - when a thread is stall, the core can switch to another thread.
+    - switching cost is much smaller than complete context swtiching 
+*** diagram
+    in multi core
+    @code text
+    thread1 -> [ C ] -> [ M ] -> [ C ] -> [ M ] -> [ C ] -> [ M ] -> ...
+    thread2 -> [emp] -> [ C ] -> [ M ] -> [ C ] -> [ M ] -> [ C ] -> [ M ] -> ...
+    thread3 -> [ C ] -> [ M ] -> [ C ] -> [ M ] -> [ C ] -> [ M ] -> ...
+    @end
+
+** Multithreeading on a single core
+*** Coarse-Grained Multithreading (粗粒度多线程)
+    - the core will focus on current thread until long delay event like cache miss, 
+      only at this time, it will switch to anther thread
+**** adv:
+     - easy to impl on hardware cause the switch condition is clear
+**** disadv:
+     only cahnge when the thread is truly stalled, 
+     the stallde time is still idle
+*** Fine-Grained Multithreading (细粒度多线程)
+    - The core rotates among threads on every cycle (or every few cycles) in a round‐robin fashion, regardless of stalls.
+      that is the core will rolling across each thread in every cycle, and thread stalled will be ignore.
+    - each cycle it issues the next instruction from a different thread, so a memory stall in one thread doesn't block the pipeline.
+    - pros: Maximally hide latency, keeps pipeline busy.
+    - Cons: Increased hardware complexity, higher register-file scoreboard pressure.
+*** diagram
+    @code text
+    in one core
+    thread -> [ C ] -> [ M ] -> [ C ] - > [ M ] -> [ C ] -> [ M ] -> ...
+    @end
+
+* Real-Time Scheduling
+** Characiteristics of RTOS
+
+
+** Issues in Real-Time scheduling
+** Real-Time Scheduling
+** Characeristic of processes
+*** Rate-Monotonic Scheduling
+*** Earliest-Deadline-First Scheduling
+*** Proportional Share Scheduling
+* Algotrithm Evaluation
+** Deterministic evalutation
+** Queueing Models
+** Simulations
+
+
