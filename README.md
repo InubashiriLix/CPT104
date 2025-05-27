@@ -1,10 +1,6 @@
 # CPT104
 
-# FUCK YOU MANGO!!!
+- fucking school, fucking exam, fucking lecture, fucking assignment, fucking project, fucking ppt, fucking tutorial, fucking paper
+- if you wanna be a cs student in XJTLU, just leave.
 
-- FUCK YOU WITH YOUR FUCKING EXAM MATERIAL LIMIT
-- A FUCKING BOOK
-- and FOUR FUCKING PAPERS FOR NOTES
-- FOR WHOLE FUCKING 12 CHAPTER
-- ONE DAY I'll GOT YOUR ADDRESS
-- AND KILL ALL OF YOUR FAMIILY AND YOUR FUCKING PETS, YOUR CHILD, YOUR HASBAND
+## I'M fucking done
