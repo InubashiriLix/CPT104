@@ -4,3 +4,7 @@
 - if you wanna be a cs student in XJTLU, just leave.
 
 ## I'M fucking done
+
+### paper txt format is in the paper folder
+
+### use notepad or vim or else editor supporting Equivalent width font
